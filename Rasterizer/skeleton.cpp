@@ -44,6 +44,8 @@ float depthBuffer[SCREEN_HEIGHT][SCREEN_WIDTH] = { 0 };
 vec4 lightPos(0, -0.5, -0.7, 1);
 vec3 lightPower = 14.0f*vec3(1, 1, 1);
 vec3 indirectLightPowerPerArea = 0.5f*vec3(1, 1, 1);
+mat4 view;
+float time = 0.0f;
 
 vec4 currentNormal;
 vec3 currentReflectance;
@@ -60,6 +62,13 @@ void DrawPolygonEdges(screen* screen, const vector<Vertex>& vertices);
 void DrawRows(screen* screen, const vector<Pixel>& leftPixels, const vector<Pixel>& rightPixels, vec3 color);
 void ComputePolygonRows(const vector<Pixel>& vertexPixels, vector<Pixel>& leftPixels, vector<Pixel>& rightPixels);
 
+vector<Vertex> ClipTriangle(vector<Vertex> vertices);
+vector<Vertex> ClipTop(vector<Vertex> vertices);
+vector<Vertex> ClipBot(vector<Vertex> vertices);
+vector<Vertex> ClipRight(vector<Vertex> vertices);
+vector<Vertex> ClipLeft(vector<Vertex> vertices);
+vector<Vertex> ClipFront(vector<Vertex> vertices);
+vector<Vertex> ClipBack(vector<Vertex> vertices);
 
 
 int main(int argc, char* argv[])
@@ -72,25 +81,6 @@ int main(int argc, char* argv[])
 	vec4 matr3(0, 0, 1, 0);
 	vec4 matr4(0, 0, 0, 1);
 	cameraTransform = mat4(matr1, matr2, matr3, matr4);
-
-	//Testing function compute polygon rows (something a bit off)
-	/*vector<ivec2> vertexPixels(3);
-	vertexPixels[0] = ivec2(10, 5);
-	vertexPixels[1] = ivec2(5, 10);
-	vertexPixels[2] = ivec2(15, 15);
-	vector<ivec2> leftPixels;
-	vector<ivec2> rightPixels;
-	ComputePolygonRows(vertexPixels, leftPixels, rightPixels);
-	for (int row = 0; row<leftPixels.size(); ++row)
-	{
-		cout << "Start: ("
-			<< leftPixels[row].x << ","
-			<< leftPixels[row].y << "). "
-			<< "End: ("
-			<< rightPixels[row].x << ","
-			<< rightPixels[row].y << "). " << endl;
-	}*/
-
 
 	while (Update())
 	{
@@ -126,19 +116,34 @@ void Draw(screen* screen)
 		vec3 norm = glm::cross(e1, e2);
 		vec4 normal = vec4(glm::normalize(norm), 1);
 		currentNormal = normal;
+
+		vector<Vertex> clippingVertices;
+		clippingVertices = ClipTriangle(vertices);
+		int size = clippingVertices.size();
+		if (size > 3) {
+			for (int i = 2; i < size; i++) {
+				vector<Vertex> vertClip;
+				vertClip.push_back(clippingVertices[i-1]);
+				vertClip.push_back(clippingVertices[i]);
+				vertClip.push_back(clippingVertices[(i + 1) % size]);
+				DrawPolygon(screen, vertClip, testScene[i].color);
+			}
+		} else {
+			DrawPolygon(screen, clippingVertices, testScene[i].color);
+		}
+
 		
 		//DrawPolygonEdges(screen, vertices);
-		DrawPolygon(screen, vertices, testScene[i].color);
 	}
 
-	for (int i = 0; i < SCREEN_HEIGHT; i++) {
-		for (int j = 0; j < SCREEN_WIDTH; j++) {
-			float value = depthBuffer[i][j];
-			vec3 color(value, value, value);
-			color *= 0.5;
-			//PutPixelSDL(screen, j, i, color);
-		}
-	}
+	//for (int i = 0; i < SCREEN_HEIGHT; i++) {
+	//	for (int j = 0; j < SCREEN_WIDTH; j++) {
+	//		float value = depthBuffer[i][j];
+	//		vec3 color(value, value, value);
+	//		color *= 0.5;
+	//		//PutPixelSDL(screen, j, i, color);
+	//	}
+	//}
 
 }
 
@@ -154,12 +159,20 @@ bool Update()
 	SDL_Event e;
 	while (SDL_PollEvent(&e))
 	{
+		
 		if (e.type == SDL_QUIT)
 		{
 			return false;
 		} else
 			if (e.type == SDL_KEYDOWN)
 			{
+				/*float radius = 1.f;
+				float camX = sin(time) * radius;
+				float camZ = cos(time) * radius;
+				time += 0.05f;
+				glm::mat4 view;
+				view = TransformFunctions::LookAt(glm::vec3(camX, 0.0, -camZ), glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0));
+				cameraPos = cameraPos * view;*/
 				int key_code = e.key.keysym.sym;
 				switch (key_code)
 				{
@@ -186,10 +199,22 @@ bool Update()
 					lightPos.z -= 0.5;
 					break;
 				case SDLK_a:
-					lightPos.x += 0.5;
+					lightPos.x -= 0.5;
 					break;
 				case SDLK_d:
-					lightPos.x -= 0.5;
+					lightPos.x += 0.5;
+					break;
+				case SDLK_i:
+					cameraPos.z += 0.2;
+					break;
+				case SDLK_k:
+					cameraPos.z -= 0.2;
+					break;
+				case SDLK_j:
+					cameraPos.x -= 0.2;
+					break;
+				case SDLK_l:
+					cameraPos.x += 0.2;
 					break;
 				case SDLK_ESCAPE:
 					/* Move camera quit */
@@ -219,11 +244,13 @@ void DrawPolygonEdges(screen* screen, const vector<Vertex>& vertices)
 }
 
 void VertexShader(const Vertex& v, Pixel& p) {
-	vec4 point = v.pos - cameraPos*cameraTransform;
+	vec4 point = v.pos -cameraPos * cameraTransform;
 	p.x = round(SCREEN_HEIGHT * (point.x / point.z) + SCREEN_WIDTH * 0.5);
 	p.y = round(SCREEN_HEIGHT * (point.y / point.z) + SCREEN_HEIGHT * 0.5);
 	p.zinv = (float)(1 / point.z);
 	p.pos3d = v.pos;
+
+
 	/*vec3 rVec = v.pos - lightPos;
 	vec3 D = (lightPower*(fmaxf(glm::dot(rVec, (vec3)v.normal), 0)));
 	float denominator = 4 * M_PI*(glm::dot(rVec,rVec));
@@ -386,4 +413,101 @@ void ComputePolygonRows(const vector<Pixel>& vertexPixels, vector<Pixel>& leftPi
 			}
 		}
 	}
+}
+
+vector<Vertex> ClipTriangle(vector<Vertex> vertices) {
+	vector<Vertex> clipped = vertices;
+	//clipped = ClipTop(clipped);
+	//clipped = ClipBot(clipped);
+	//clipped = ClipRight(clipped);
+	//clipped = ClipLeft(clipped);
+	//clipped = ClipFront(clipped);
+	//clipped = ClipBack(clipped);
+	return clipped;
+}
+
+vector<Vertex> ClipBack(vector<Vertex> vertices) {
+	vector<Vertex> clipped;
+	return clipped;
+}
+
+vector<Vertex> ClipFront(vector<Vertex> vertices) {
+	vector<Vertex> clipped;
+	return clipped;
+}
+
+vector<Vertex> ClipLeft(vector<Vertex> vertices) {
+	vector<Vertex> clipped;
+	return clipped;
+}
+
+vector<Vertex> ClipRight(vector<Vertex> vertices) {
+	vector<Vertex> clipped;
+	return clipped;
+}
+
+vector<Vertex> ClipBot(vector<Vertex> vertices) {
+	vector<Vertex> clipped;
+	float yMin = -SCREEN_HEIGHT * 0.5 - 100;
+	int size = vertices.size();
+	for (int i = 0; i < size; i++) {
+		Vertex v1 = vertices[i];
+		vec4 pos1 = v1.pos - cameraPos * cameraTransform;
+		Vertex v2 = vertices[(i + 1) % size];
+		vec4 pos2 = v2.pos - cameraPos * cameraTransform;
+		float v1class = pos1.y - yMin;
+		float v2class = pos2.y - yMin;
+
+		if (v1class > 0 && v2class > 0) {
+			clipped.push_back(v2);
+		}
+
+		if (v1class > 0 && v2class < 0) {
+			float step = v1class / (v1class - v2class);
+			Vertex v;
+			v.pos = v1.pos + step * (v1.pos - v2.pos);
+			clipped.push_back(v);
+		}
+		if (v2class > 0 && v1class < 0) {
+			float step = v2class / (v2class - v1class);
+			Vertex v;
+			v.pos = v2.pos + step * (v2.pos - v1.pos);
+			clipped.push_back(v);
+			clipped.push_back(v2);
+		}
+	}
+	return clipped;
+}
+
+vector<Vertex> ClipTop(vector<Vertex> vertices) {
+	vector<Vertex> clipped;
+	float yMax = SCREEN_HEIGHT + 100;
+	int size = vertices.size();
+	for (int i = 0; i < size; i++) {
+		Vertex v1 = vertices[i];
+		float y1 = round(SCREEN_HEIGHT * (v1.pos.y / v1.pos.z) + SCREEN_WIDTH * 0.5);
+		Vertex v2 = vertices[(i + 1) % size];
+		float y2 = round(SCREEN_HEIGHT * (v2.pos.y / v2.pos.z) + SCREEN_WIDTH * 0.5);
+		float v1class = yMax - y1;
+		float v2class = yMax - y2;
+
+		if (v1class > 0 && v2class > 0) {
+			clipped.push_back(v2);
+		}
+
+		if (v1class > 0 && v2class < 0) {
+			float step = y1 / (y1 - y2);
+			Vertex v;
+			v.pos = v1.pos + step * (v1.pos - v2.pos);
+			clipped.push_back(v);
+		}
+		if (v2class > 0 && v1class < 0) {
+			float step = y2 / (y2 - y1);
+			Vertex v;
+			v.pos = v2.pos + step * (v2.pos - v1.pos);
+			clipped.push_back(v);
+			clipped.push_back(v2);
+		}
+	}
+	return clipped;
 }
