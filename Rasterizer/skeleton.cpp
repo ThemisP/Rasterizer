@@ -107,9 +107,9 @@ void Draw(screen* screen)
 		vec4 v0 = testScene[i].v0;
 		vec4 v1 = testScene[i].v1;
 		vec4 v2 = testScene[i].v2;
-		vertices[0].pos = v0;
-		vertices[1].pos = v1;
-		vertices[2].pos = v2;
+		vertices[0].pos = v0 - cameraPos * cameraTransform;
+		vertices[1].pos = v1 - cameraPos * cameraTransform;
+		vertices[2].pos = v2 - cameraPos * cameraTransform;
 
 		vec3 e1 = v1 - v0;
 		vec3 e2 = v2 - v0;
@@ -121,11 +121,11 @@ void Draw(screen* screen)
 		clippingVertices = ClipTriangle(vertices);
 		int size = clippingVertices.size();
 		if (size > 3) {
-			for (int i = 2; i < size; i++) {
-				vector<Vertex> vertClip;
-				vertClip.push_back(clippingVertices[i-1]);
-				vertClip.push_back(clippingVertices[i]);
-				vertClip.push_back(clippingVertices[(i + 1) % size]);
+			for (int j = 1; j < size; j+=2) {
+				vector<Vertex> vertClip(3);
+				vertClip[0] = (clippingVertices[j-1]);
+				vertClip[1] = (clippingVertices[j]);
+				vertClip[2] = (clippingVertices[(j + 1) % size]);
 				DrawPolygon(screen, vertClip, testScene[i].color);
 			}
 		} else {
@@ -244,7 +244,7 @@ void DrawPolygonEdges(screen* screen, const vector<Vertex>& vertices)
 }
 
 void VertexShader(const Vertex& v, Pixel& p) {
-	vec4 point = v.pos -cameraPos * cameraTransform;
+	vec4 point = v.pos;// -cameraPos * cameraTransform;
 	p.x = round(SCREEN_HEIGHT * (point.x / point.z) + SCREEN_WIDTH * 0.5);
 	p.y = round(SCREEN_HEIGHT * (point.y / point.z) + SCREEN_HEIGHT * 0.5);
 	p.zinv = (float)(1 / point.z);
@@ -266,7 +266,8 @@ void PixelShader(screen* screen, const Pixel& p, vec3 color) {
 	int y = p.y;
 	if (p.zinv > depthBuffer[y][x])
 	{
-		vec3 rVec = p.pos3d - lightPos;
+		vec3 lightPosCam = lightPos - cameraPos * cameraTransform;
+		vec3 rVec = (vec3)p.pos3d - lightPosCam;
 		vec3 D = (lightPower*(fmaxf(glm::dot(rVec, (vec3)currentNormal), 0)));
 		float denominator = 4 * M_PI*(glm::dot(rVec, rVec));
 		D.x = D.x / denominator;
@@ -372,6 +373,7 @@ void ComputePolygonRows(const vector<Pixel>& vertexPixels, vector<Pixel>& leftPi
 	// 2. Resize leftPixels and rightPixels
 	// so that they have an element for each row.
 	int Rows = ymax - ymin + 1;
+	//cout << ymax << " " << ymin << " " << Rows << endl;
 	leftPixels.resize(Rows);
 	rightPixels.resize(Rows);	
 
@@ -417,10 +419,10 @@ void ComputePolygonRows(const vector<Pixel>& vertexPixels, vector<Pixel>& leftPi
 
 vector<Vertex> ClipTriangle(vector<Vertex> vertices) {
 	vector<Vertex> clipped = vertices;
-	clipped = ClipTop(clipped);
-	clipped = ClipBot(clipped);
-	clipped = ClipRight(clipped);
-	clipped = ClipLeft(clipped);
+	//clipped = ClipTop(clipped);
+	//clipped = ClipBot(clipped);
+	//clipped = ClipRight(clipped);
+	//clipped = ClipLeft(clipped);
 	clipped = ClipFront(clipped);
 	//clipped = ClipBack(clipped);
 	return clipped;
@@ -438,8 +440,8 @@ vector<Vertex> ClipFront(vector<Vertex> vertices) {
 		Vertex v1 = vertices[i];
 		Vertex v2 = vertices[(i + 1) % size];
 
-		vec4 pos1 = v1.pos - cameraPos * cameraTransform;
-		vec4 pos2 = v2.pos - cameraPos * cameraTransform;
+		vec4 pos1 = v1.pos;
+		vec4 pos2 = v2.pos;
 		float nearLimit = 1.0f;
 
 		bool p1In = pos1.z > nearLimit;
@@ -450,12 +452,14 @@ vector<Vertex> ClipFront(vector<Vertex> vertices) {
 		if (p1In && p2In) {
 			clipped.push_back(v2);
 		} else if (p1In && !p2In) {
-			float scalar = (nearLimit - pos1.z) / (pos2.z - pos1.z);
+			float distZ = pos2.z - pos1.z;
+			float scalar = (pos1.z - nearLimit) / distZ;
 			Vertex Intersection;
 			Intersection.pos = vec4((vec3)pos1 + scalar * ((vec3)(pos2 - pos1)), 1);
 			clipped.push_back(Intersection);
 		} else if (!p1In && p2In) {
-			float scalar = (nearLimit - pos1.z) / (-pos2.z + pos1.z);
+			float distZ = 1 - pos2.z - (1 - pos1.z);
+			float scalar = (1 - pos1.z) / distZ;
 			Vertex Intersection;
 			Intersection.pos = vec4((vec3)pos1 + scalar * ((vec3)(pos2 - pos1)), 1);
 			clipped.push_back(Intersection);
@@ -475,8 +479,8 @@ vector<Vertex> ClipLeft(vector<Vertex> vertices) {
 		vec4 pos1 = v1.pos - cameraPos * cameraTransform;
 		vec4 pos2 = v2.pos - cameraPos * cameraTransform;
 
-		bool p1In = pos1.x > (-pos1.z);
-		bool p2In = pos2.x > (-pos2.z);
+		bool p1In = pos1.x < (pos1.z);
+		bool p2In = pos2.x < (pos2.z);
 
 
 
@@ -512,8 +516,8 @@ vector<Vertex> ClipRight(vector<Vertex> vertices) {
 		vec4 pos1 = v1.pos - cameraPos * cameraTransform;
 		vec4 pos2 = v2.pos - cameraPos * cameraTransform;
 
-		bool p1In = pos1.x < (pos1.z);
-		bool p2In = pos2.x < (pos2.z);
+		bool p1In = pos1.x > (-pos1.z);
+		bool p2In = pos2.x > (-pos2.z);
 
 
 
@@ -530,43 +534,6 @@ vector<Vertex> ClipRight(vector<Vertex> vertices) {
 			float distX = pos2.x - pos1.x;
 			float distZ = pos2.z - pos1.z;
 			float scalar = (pos1.x - pos1.z) / (-distX + distZ);
-			Vertex Intersection;
-			Intersection.pos = vec4((vec3)pos1 + scalar * ((vec3)(pos2 - pos1)), 1);
-			clipped.push_back(Intersection);
-			clipped.push_back(v2);
-		}
-	}
-	return clipped;
-}
-
-vector<Vertex> ClipBot(vector<Vertex> vertices) {
-	vector<Vertex> clipped;
-	int size = vertices.size();
-	for (int i = 0; i < size; i++) {
-		Vertex v1 = vertices[i];
-		Vertex v2 = vertices[(i + 1) % size];
-
-		vec4 pos1 = v1.pos - cameraPos * cameraTransform;
-		vec4 pos2 = v2.pos - cameraPos * cameraTransform;
-
-		bool p1In = pos1.y > (-pos1.z);
-		bool p2In = pos2.y > (-pos2.z);
-
-
-
-		if (p1In && p2In) {
-			clipped.push_back(v2);
-		} else if (p1In && !p2In) {
-			float distY = pos2.y - pos1.y;
-			float distZ = pos2.z - pos1.z;
-			float scalar = (pos1.y - pos1.z) / (-distY - distZ);
-			Vertex Intersection;
-			Intersection.pos = vec4((vec3)pos1 + scalar * ((vec3)(pos2 - pos1)), 1);
-			clipped.push_back(Intersection);
-		} else if (!p1In && p2In) {
-			float distY = pos2.y - pos1.y;
-			float distZ = pos2.z - pos1.z;
-			float scalar = (pos1.y - pos1.z) / (-distY - distZ);
 			Vertex Intersection;
 			Intersection.pos = vec4((vec3)pos1 + scalar * ((vec3)(pos2 - pos1)), 1);
 			clipped.push_back(Intersection);
@@ -583,8 +550,45 @@ vector<Vertex> ClipTop(vector<Vertex> vertices) {
 		Vertex v1 = vertices[i];
 		Vertex v2 = vertices[(i + 1) % size];
 
-		vec4 pos1 = v1.pos - cameraPos * cameraTransform;
-		vec4 pos2 = v2.pos - cameraPos * cameraTransform;
+		vec4 pos1 = v1.pos;
+		vec4 pos2 = v2.pos;
+
+		bool p1In = pos1.y > (-pos1.z);
+		bool p2In = pos2.y > (-pos2.z);
+
+
+
+		if (p1In && p2In) {
+			clipped.push_back(v2);
+		} else if (p1In && !p2In) {
+			float distY = pos2.y - pos1.y;
+			float distZ = pos2.z - pos1.z;
+			float scalar = (pos1.y + pos1.z) / (-distY - distZ);
+			Vertex Intersection;
+			Intersection.pos = vec4((vec3)pos1 + scalar * ((vec3)(pos2 - pos1)), 1);
+			clipped.push_back(Intersection);
+		} else if (!p1In && p2In) {
+			float distY = pos2.y - pos1.y;
+			float distZ = pos2.z - pos1.z;
+			float scalar = (pos1.y + pos1.z) / (-distY - distZ);
+			Vertex Intersection;
+			Intersection.pos = vec4((vec3)pos1 + scalar * ((vec3)(pos2 - pos1)), 1);
+			clipped.push_back(Intersection);
+			clipped.push_back(v2);
+		}
+	}
+	return clipped;
+}
+
+vector<Vertex> ClipBot(vector<Vertex> vertices) {
+	vector<Vertex> clipped;
+	int size = vertices.size();
+	for (int i = 0; i < size; i++) {
+		Vertex v1 = vertices[i];
+		Vertex v2 = vertices[(i + 1) % size];
+
+		vec4 pos1 = v1.pos;
+		vec4 pos2 = v2.pos;
 
 		bool p1In = pos1.y < (pos1.z);
 		bool p2In = pos2.y < (pos2.z);
