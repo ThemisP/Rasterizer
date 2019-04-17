@@ -121,7 +121,7 @@ void Draw(screen* screen)
 		clippingVertices = ClipTriangle(vertices);
 		int size = clippingVertices.size();
 		if (size > 3) {
-			for (int j = 1; j < size; j+=2) {
+			for (int j = 1; j < size; j++) {
 				vector<Vertex> vertClip(3);
 				vertClip[0] = (clippingVertices[j-1]);
 				vertClip[1] = (clippingVertices[j]);
@@ -419,11 +419,11 @@ void ComputePolygonRows(const vector<Pixel>& vertexPixels, vector<Pixel>& leftPi
 
 vector<Vertex> ClipTriangle(vector<Vertex> vertices) {
 	vector<Vertex> clipped = vertices;
-	//clipped = ClipTop(clipped);
-	//clipped = ClipBot(clipped);
-	//clipped = ClipRight(clipped);
+	clipped = ClipTop(clipped);
+	clipped = ClipBot(clipped);
+	clipped = ClipRight(clipped);
 	//clipped = ClipLeft(clipped);
-	clipped = ClipFront(clipped);
+	//clipped = ClipFront(clipped);
 	//clipped = ClipBack(clipped);
 	return clipped;
 }
@@ -476,8 +476,8 @@ vector<Vertex> ClipLeft(vector<Vertex> vertices) {
 		Vertex v1 = vertices[i];
 		Vertex v2 = vertices[(i + 1) % size];
 
-		vec4 pos1 = v1.pos - cameraPos * cameraTransform;
-		vec4 pos2 = v2.pos - cameraPos * cameraTransform;
+		vec4 pos1 = v1.pos;
+		vec4 pos2 = v2.pos;
 
 		bool p1In = pos1.x < (pos1.z);
 		bool p2In = pos2.x < (pos2.z);
@@ -513,11 +513,11 @@ vector<Vertex> ClipRight(vector<Vertex> vertices) {
 		Vertex v1 = vertices[i];
 		Vertex v2 = vertices[(i + 1) % size];
 
-		vec4 pos1 = v1.pos - cameraPos * cameraTransform;
-		vec4 pos2 = v2.pos - cameraPos * cameraTransform;
+		vec4 pos1 = v1.pos;
+		vec4 pos2 = v2.pos;
 
-		bool p1In = pos1.x > (-pos1.z);
-		bool p2In = pos2.x > (-pos2.z);
+		bool p1In = pos1.x < (pos1.z);
+		bool p2In = pos2.x < (pos2.z);
 
 
 
