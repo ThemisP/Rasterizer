@@ -74,7 +74,8 @@ vector<Vertex> ClipBack(vector<Vertex> vertices);
 int main(int argc, char* argv[])
 {
 	screen *screen = InitializeSDL(SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE);
-	LoadTestModel(testScene);
+	//LoadTestModel(testScene);
+	LoadTerrainGeneration(testScene, 10, 10);
 
 	vec4 matr1(1, 0, 0, 0);
 	vec4 matr2(0, 1, 0, 0);
@@ -215,6 +216,12 @@ bool Update()
 					break;
 				case SDLK_l:
 					cameraPos.x += 0.2;
+					break;
+				case SDLK_o:
+					cameraPos.y += 0.2;
+					break;
+				case SDLK_u:
+					cameraPos.y -= 0.2;
 					break;
 				case SDLK_ESCAPE:
 					/* Move camera quit */
