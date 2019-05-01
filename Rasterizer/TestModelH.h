@@ -5,6 +5,7 @@
 
 #include <glm/glm.hpp>
 #include <vector>
+#include "PerlinNoise.cpp"
 
 // Used to describe a triangular surface:
 class Triangle
@@ -34,9 +35,38 @@ public:
 	}
 };
 
+glm::vec3 ColorPicker(float value) {
+	glm::vec3 red(0.75f, 0.15f, 0.15f);
+	glm::vec3 yellow(0.75f, 0.75f, 0.15f);
+	glm::vec3 green(0.15f, 0.75f, 0.15f);
+	glm::vec3 cyan(0.15f, 0.75f, 0.75f);
+	glm::vec3 blue(0.15f, 0.15f, 0.75f);
+	glm::vec3 purple(0.75f, 0.15f, 0.75f);
+	glm::vec3 white(0.75f, 0.75f, 0.75f);
+	glm::vec3 black(0.0f, 0.0f, 0.0f);
+	
+	if (value < 0.2) {
+		return red*value + white*(1-value);
+	} else if (value < 0.4) {
+		float ratio = (value - 0.2) * 5;
+		return white*(1-ratio) + green*ratio;
+	} else if (value < 0.6) {
+		float ratio = (value - 0.4) * 5;
+		return green*(1-ratio)+cyan*ratio;
+	} else if (value < 0.8) {
+		float ratio = (value - 0.6) * 5;
+		return cyan*(1-ratio)+blue*ratio;
+	} else {
+		float ratio = (value - 0.8) * 5;
+		return blue*(1-ratio)+black*ratio;
+	}
+}
+
 void LoadTerrainGeneration(std::vector<Triangle>& triangles, int xSize, int zSize) {
 	using glm::vec3;
 	using glm::vec4;
+
+	PerlinNoise perlinNoise;
 
 	// Defines colors:
 	vec3 red(0.75f, 0.15f, 0.15f);
@@ -47,6 +77,8 @@ void LoadTerrainGeneration(std::vector<Triangle>& triangles, int xSize, int zSiz
 	vec3 purple(0.75f, 0.15f, 0.75f);
 	vec3 white(0.75f, 0.75f, 0.75f);
 
+	vec3 fullWhite(1.0f, 1.0f, 1.0f);
+
 	triangles.clear();
 	triangles.reserve(20);
 
@@ -56,8 +88,9 @@ void LoadTerrainGeneration(std::vector<Triangle>& triangles, int xSize, int zSiz
 	int i = 0;
 	for (int z = 0; z <= zSize; z++) {
 		for (int x = 0; x <= xSize; x++) {
-			float random = ((float)rand() / (float)(RAND_MAX))*0.5 + 1;
-			vertices[i] = vec4((x - xSize / 2)*0.2, random, (z - zSize / 2)*0.2, 1);
+			//float random = ((float)rand() / (float)(RAND_MAX))*0.5 + 1;
+			float random = perlinNoise.perlin(z/70.2, x/70.2, 1);
+			vertices[i] = vec4((x - xSize / 2)*0.01, random, (z - zSize / 2)*0.01 -2, 1);
 			i++;
 		}
 	}
@@ -68,14 +101,17 @@ void LoadTerrainGeneration(std::vector<Triangle>& triangles, int xSize, int zSiz
 			vec4 a = vertices[vert];
 			vec4 b = vertices[vert + 1];
 			vec4 c = vertices[vert + xSize + 1];
-
-			triangles.push_back(Triangle(a, b, c, green));
+			
+			//vec3 colorIn = fullWhite * a.y;
+			vec3 colorIn = ColorPicker(a.y);
+			triangles.push_back(Triangle(b, a, c, colorIn));
 
 			vec4 d = vertices[vert + 1];
 			vec4 e = vertices[vert + xSize + 1];
 			vec4 f = vertices[vert + xSize + 2];
-
-			triangles.push_back(Triangle(d, e, f, red));
+			//colorIn = fullWhite * d.y;
+			colorIn = ColorPicker(d.y);
+			triangles.push_back(Triangle(d, e, f, colorIn));
 			vert++;
 		}
 		vert++;

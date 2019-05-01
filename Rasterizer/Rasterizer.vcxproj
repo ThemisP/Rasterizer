@@ -122,6 +122,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="PerlinNoise.cpp" />
     <ClCompile Include="skeleton.cpp" />
     <ClCompile Include="TransformFunctions.cpp" />
     <ClCompile Include="TransformMat4.cpp" />

@@ -74,8 +74,8 @@ vector<Vertex> ClipBack(vector<Vertex> vertices);
 int main(int argc, char* argv[])
 {
 	screen *screen = InitializeSDL(SCREEN_WIDTH, SCREEN_HEIGHT, FULLSCREEN_MODE);
-	//LoadTestModel(testScene);
-	LoadTerrainGeneration(testScene, 10, 10);
+	LoadTestModel(testScene);
+	//LoadTerrainGeneration(testScene, 1000, 1000);
 
 	vec4 matr1(1, 0, 0, 0);
 	vec4 matr2(0, 1, 0, 0);
